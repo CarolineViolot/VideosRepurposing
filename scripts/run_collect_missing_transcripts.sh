@@ -12,7 +12,7 @@
 #SBATCH --mail-type END,FAIL
 #SBATCH --mail-user caroline.violot@unil.ch
 
-python scripts/collect_missing_transcripts.py \
+python collect_missing_transcripts.py \
   --platform "youtube" \
   --year "2022" \
   --channel_type "news" \
