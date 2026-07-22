@@ -1,4 +1,13 @@
+#Pycharm
+.idea/*
+
+
+
+# project
 data/*
 Figures/*
 notebooks/*
-
+scripts/__pycache__/*
+*.DS_Store
+src/__pycache__/*
+tests/*
