@@ -79,9 +79,18 @@ def save_transcript(video_id: str, result: dict, transcripts_dir: str):
         json.dump(result, f, ensure_ascii=False, indent=2)
 
 
-def load_pending_videos(platform: str, year: str, channel_type: str) -> list[tuple]:
+def load_pending_videos(video_filepath) -> list[tuple]:
     """Return (video_id, user/channel, duration) for videos missing a transcript source."""
-    videos = read_json_or_jsonl(f"data/{platform}/videos/{channel_type}_videos_{year}")
+    if "tiktok" in video_filepath:
+        platform = "tiktok"
+    elif "youtube" in video_filepath:
+        platform = "youtube"
+    else :
+        raise ValueError(f"Could not determine platform from filepath: {video_filepath}")
+    #video_filename = video_filepath.split("/")[-1]
+    #video_filename, extension = video_filename.split(".")
+    #channel_type, _, year = video_filename.split("_")
+    videos = read_json_or_jsonl(video_filepath)
 
     if platform == "tiktok":
         return [
@@ -95,7 +104,6 @@ def load_pending_videos(platform: str, year: str, channel_type: str) -> list[tup
             for row in videos
             if row["duration"] > 0 and isinstance(row["error_transcript"], str)
         ]
-    raise ValueError(f"Unknown platform: {platform}")
 
 
 def load_done_video_ids(transcripts_dir: str, platform: str) -> set:
@@ -111,16 +119,17 @@ def main():
     parser.add_argument("--year", type=str, required=True)
     parser.add_argument("--channel_type", type=str, required=True)
     parser.add_argument("--keep_videos", action="store_true", default=True)
+    parser.add_arument("--video_filepath", type=str, required=True)
     parser.add_argument("--transcripts_dir", type=str, required=True)
-    parser.add_argument("--videos_dir", type=str, required=True)
+    parser.add_argument("--downloaded_videos_dir", type=str, required=True)
     args = parser.parse_args()
 
     transcripts_dir = args.transcript_dir
-    videos_dir = args.videos_dir
+    downloaded_videos_dir = args.downloaded_videos_dir
 
-    tiktok_dl = TikTokDownloader(output_dir=videos_dir, browser="firefox") if args.platform == "tiktok" else None
+    tiktok_dl = TikTokDownloader(output_dir=downloaded_videos_dir, browser="firefox") if args.platform == "tiktok" else None
 
-    pending_videos = load_pending_videos(args.platform, args.year, args.channel_type)
+    pending_videos = load_pending_videos(args.video_filepath)
     done_ids = load_done_video_ids(transcripts_dir, args.platform)
     pairs = [p for p in pending_videos if p[0] not in done_ids and p[0] not in SKIP_IDS]
     print(f"Processing {len(pairs)}/{len(pending_videos)} video(s).\n")
@@ -144,9 +153,9 @@ def main():
         pbar.set_postfix({"id": video_id, "duration": f"{int(duration // 60)}m{int(duration % 60)}s"})
 
         # ── Download (or reuse an existing file) ──────────
-        matches = list(Path(videos_dir).glob(f"{video_id}.*"))
+        matches = list(Path(downloaded_videos_dir).glob(f"{video_id}.*"))
         video_path = matches[0] if matches else download_video(
-            video_id, user, videos_dir, args.platform, tiktok_dl
+            video_id, user, downloaded_videos_dir, args.platform, tiktok_dl
         )
         if video_path is None:
             results_summary.append({"id": video_id, "status": "download_failed"})
@@ -190,7 +199,12 @@ def main():
 
 if __name__ == "__main__":
     platform = "youtube"
-    sys.argv = ["collect_missing_transcripts", "--platform", platform, "--year", "2022",
-                "--channel_type", "news", "--videos_dir", f"data/{platform}/videos/downloaded",
-                "--transcripts_dir", f"data/{platform}/videos/transcripts"]
+    year = "2022"
+    channel_type = "news"
+
+    #sys.argv = ["collect_missing_transcripts", "--platform", platform, "--year", "2022",
+    #            "--channel_type", "news",
+    #            "--video_filepath", f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl",
+    #            "--downloaded_videos_dir", f"data/{platform}/videos/downloaded",
+    #            "--transcripts_dir", f"data/{platform}/videos/transcripts"]
     main()
