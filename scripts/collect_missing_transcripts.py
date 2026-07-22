@@ -143,8 +143,7 @@ def main():
     thrs_min = [5, 15, 30, 60, 120]
     print(f"{len([d for d in list_durations if d < 5*60])} videos < 5 min")
     for i in range(4):
-        print(f"{len([d for d in list_durations if ((d >= thrs_min[i]) & (d < thrs_min[i+1])) ] )
-        } videos btw {thrs_min[i]} min and {thrs_min[i+1]} min")
+        print(f"{len([d for d in list_durations if ((d >= thrs_min[i]) & (d < thrs_min[i+1])) ] )} videos btw {thrs_min[i]} min and {thrs_min[i+1]} min")
     print(f"{len([d for d in list_durations if d > 120*60])} videos > 120 min")
 
     results_summary = []
