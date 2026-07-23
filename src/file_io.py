@@ -5,15 +5,6 @@ from pathlib import Path
 import pandas as pd
 from src.utils import get_channel_names_dict, get_politician2party, get_party_orientation, get_tt_username2display_name, get_news_channel_orientation
 
-def read_json_or_jsonl(base_path: str) -> list[dict]:
-    """Load records from <base_path>.jsonl (one object per line) or <base_path>.json (a list)."""
-    jsonl = Path(f"{base_path}.jsonl")
-    if jsonl.exists():
-        with open(jsonl) as f:
-            return [json.loads(line) for line in f if line.strip()]
-    with open(f"{base_path}_w_transcript.json") as f:
-        return json.load(f)
-
 
 def load_channels_files():
     nm_yt_channels = pd.read_json("data/youtube/channels/news_channels.json")
@@ -79,8 +70,10 @@ def create_all_channel_df(news_channel_df, pp_channel_df):
 def load_videos_only_df(year, type, platform):
     raise NotImplementedError()
 
+
 def load_transcripts_only_df(year, channel_type, platform):
-    data = read_json_or_jsonl(f"data/{platform}/videos/{channel_type}_videos_{year}")
+    with open(f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl") as f:
+        data = [json.loads(line) for line in f if line.strip()]
 
     if platform == "tiktok":
         return [
@@ -95,7 +88,7 @@ def load_transcripts_only_df(year, channel_type, platform):
             if row["duration"] > 0
         ]
 
-
+# TODO remove this function it's useless now
 def create_transcripts_and_videos_by_year(platform='youtube'):
     if platform not in ['youtube', 'tiktok']:
         raise ValueError(f"invalid platform {platform}. Must be 'tiktok' or 'youtube'")

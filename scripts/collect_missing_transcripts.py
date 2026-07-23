@@ -14,7 +14,6 @@ from tqdm import tqdm
 if os.path.isdir("../data/"):
     os.chdir("../")
 from src.tiktok_downloader import TikTokDownloader
-from src.file_io import read_json_or_jsonl
 
 SKIP_IDS = {"7357731711775460640", 7357731711775460640}
 
@@ -88,10 +87,9 @@ def load_pending_videos(video_filepath) -> list[tuple]:
         platform = "youtube"
     else :
         raise ValueError(f"Could not determine platform from filepath: {video_filepath}")
-    #video_filename = video_filepath.split("/")[-1]
-    #video_filename, extension = video_filename.split(".")
-    #channel_type, _, year = video_filename.split("_")
-    videos = pd.read_json(video_filepath, lines=True)
+
+    with open(video_filepath) as f:
+        videos = [json.loads(line) for line in f if line.strip()]
 
     if platform == "tiktok":
         return [
