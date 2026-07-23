@@ -12,6 +12,14 @@
 #SBATCH --mail-type END,FAIL
 #SBATCH --mail-user caroline.violot@unil.ch
 
+dcsrsoft use 20241118
+module load python/3.11.7
+module load ffmpeg/6.1.1
+
+WORK_PATH=/work/FAC/HEC/DESI/mhumber6/youtubeshorts/
+
+source $WORK_PATH/pythonenv_new/bin/activate
+
 python scripts/collect_missing_transcripts.py \
   --platform "youtube" \
   --year "2022" \
