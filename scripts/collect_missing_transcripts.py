@@ -90,7 +90,7 @@ def load_pending_videos(video_filepath) -> list[tuple]:
     #video_filename = video_filepath.split("/")[-1]
     #video_filename, extension = video_filename.split(".")
     #channel_type, _, year = video_filename.split("_")
-    videos = read_json_or_jsonl(video_filepath)
+    videos = video_filepath
 
     if platform == "tiktok":
         return [
