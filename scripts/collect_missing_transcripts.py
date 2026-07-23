@@ -119,7 +119,7 @@ def main():
     parser.add_argument("--year", type=str, required=True)
     parser.add_argument("--channel_type", type=str, required=True)
     parser.add_argument("--keep_videos", action="store_true", default=True)
-    parser.add_arument("--video_filepath", type=str, required=True)
+    parser.add_argument("--video_filepath", type=str, required=True)
     parser.add_argument("--transcripts_dir", type=str, required=True)
     parser.add_argument("--downloaded_videos_dir", type=str, required=True)
     args = parser.parse_args()
