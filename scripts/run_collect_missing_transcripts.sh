@@ -12,6 +12,7 @@
 #SBATCH --mail-type END,FAIL
 #SBATCH --mail-user caroline.violot@unil.ch
 
+dcsrsoft use 20241118
 module load python/3.11.7
 module load ffmpeg/6.1.1
 
