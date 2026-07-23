@@ -22,6 +22,8 @@ source $WORK_PATH/pythonenv_new/bin/activate
 cd /work/FAC/HEC/DESI/mhumber6/youtubeshorts/VideosRepurposing
 export PYTHONPATH="$PWD"
 
+export PATH=/scratch/cviolot/French-Politicians/deno-bin:$PATH
+
 python scripts/collect_missing_transcripts.py \
   --platform "youtube" \
   --year "2022" \
