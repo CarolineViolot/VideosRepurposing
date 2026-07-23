@@ -123,9 +123,9 @@ def main():
     parser.add_argument("--transcripts_dir", type=str, required=True)
     parser.add_argument("--downloaded_videos_dir", type=str, required=True)
     args = parser.parse_args()
-    args.keep_videos = args.keep_videos == "yes"
 
-    transcripts_dir = args.transcript_dir
+    keep_videos = args.keep_videos == "yes"
+    transcripts_dir = args.transcripts_dir
     downloaded_videos_dir = args.downloaded_videos_dir
 
     tiktok_dl = TikTokDownloader(output_dir=downloaded_videos_dir, browser="firefox") if args.platform == "tiktok" else None
@@ -173,7 +173,7 @@ def main():
 
         # ── Save, clean up ────────────────────────────────
         save_transcript(video_id, result, transcripts_dir)
-        if not args.keep_videos:
+        if not keep_videos:
             video_path.unlink(missing_ok=True)
 
         results_summary.append({
