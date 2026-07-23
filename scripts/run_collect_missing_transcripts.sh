@@ -5,13 +5,14 @@
 #SBATCH --output logs/%j.out
 
 #SBATCH --partition cpu
-#SBATCH --cpus-per-task 1
+#SBATCH --cpus-per-task 8
 #SBATCH --mem 10G
 #SBATCH --time 12:00:00
 #SBATCH --export NONE
 #SBATCH --mail-type END,FAIL
 #SBATCH --mail-user caroline.violot@unil.ch
 
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 dcsrsoft use 20241118
 module load python/3.11.7
 module load ffmpeg/6.1.1
