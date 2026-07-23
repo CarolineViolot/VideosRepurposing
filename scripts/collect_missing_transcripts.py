@@ -5,6 +5,7 @@ import subprocess
 import argparse
 import datetime
 from pathlib import Path
+import pandas as pd
 
 from faster_whisper import WhisperModel
 from torch.optim.optimizer import Args
@@ -90,7 +91,7 @@ def load_pending_videos(video_filepath) -> list[tuple]:
     #video_filename = video_filepath.split("/")[-1]
     #video_filename, extension = video_filename.split(".")
     #channel_type, _, year = video_filename.split("_")
-    videos = video_filepath
+    videos = pd.read_json(video_filepath, lines=True)
 
     if platform == "tiktok":
         return [
@@ -198,9 +199,9 @@ def main():
 
 
 if __name__ == "__main__":
-    platform = "youtube"
-    year = "2022"
-    channel_type = "news"
+    #platform = "youtube"
+    #year = "2022"
+    #channel_type = "news"
 
     #sys.argv = ["collect_missing_transcripts", "--platform", platform, "--year", "2022",
     #            "--channel_type", "news",
