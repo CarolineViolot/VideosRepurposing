@@ -7,7 +7,7 @@
 #SBATCH --partition cpu
 #SBATCH --cpus-per-task 8
 #SBATCH --mem 32G
-#SBATCH --time 12:00:00
+#SBATCH --time 48:00:00
 #SBATCH --export NONE
 #SBATCH --mail-type END,FAIL
 #SBATCH --mail-user caroline.violot@unil.ch
