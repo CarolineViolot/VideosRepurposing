@@ -95,7 +95,7 @@ def load_pending_videos(video_filepath) -> list[tuple]:
         return [
             (row["id"], row["username"], row["video_duration"])
             for row in videos
-            if row["video_duration"] > 0 and not row.get("voice_to_text")
+            if (row["video_duration"] > 0 and row["video_duration"] < 18000) and not row.get("voice_to_text")
         ]
     if platform == "youtube":
         return [
@@ -132,6 +132,7 @@ def main():
     pending_videos = load_pending_videos(args.video_filepath)
     done_ids = load_done_video_ids(transcripts_dir, args.platform)
     pairs = [p for p in pending_videos if p[0] not in done_ids and p[0] not in SKIP_IDS]
+    #pairs.reverse()
     print(f"Processing {len(pairs)}/{len(pending_videos)} video(s).\n")
 
     model = WhisperModel("medium", device="cpu", compute_type="int8", cpu_threads=8)
@@ -201,7 +202,7 @@ if __name__ == "__main__":
     #year = "2022"
     #channel_type = "news"
 
-    #sys.argv = ["collect_missing_transcripts", "--platform", platform, "--year", "2022",
+    #sys.argv = ["collect_missing_transcripts", "--platform", platform, "--year", year,
     #            "--channel_type", "news",
     #            "--video_filepath", f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl",
     #            "--downloaded_videos_dir", f"data/{platform}/videos/downloaded",
