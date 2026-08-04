@@ -95,7 +95,7 @@ def load_pending_videos(video_filepath) -> list[tuple]:
         return [
             (row["id"], row["username"], row["video_duration"])
             for row in videos
-            if (row["video_duration"] > 0 and row["video_duration"] < 18000) and not row.get("voice_to_text")
+            if (row["video_duration"] > 0 and row["video_duration"] < 14000) and not row.get("voice_to_text")
         ]
     if platform == "youtube":
         return [
