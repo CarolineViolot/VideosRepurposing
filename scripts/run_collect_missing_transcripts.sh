@@ -31,5 +31,6 @@ python scripts/collect_missing_transcripts.py \
   --channel_type "news" \
   --keep_videos "no" \
   --video_filepath "/scratch/cviolot/French-Politicians/youtube/news_videos_2024.jsonl" \
-  --downloaded_videos_dir '/scratch/cviolot/French-Politicians/videos' \
-  --transcripts_dir '/scratch/cviolot/French-Politicians/transcripts'
+  --downloaded_videos_dir "/scratch/cviolot/French-Politicians/videos" \
+  --transcripts_dir "/scratch/cviolot/French-Politicians/transcripts" \
+  --cookies_path "/scratch/cviolot/French-Politicians/youtube/yt_cookies.txt"

@@ -25,7 +25,7 @@ def video_url(video_id: str, user: str, platform: str) -> str:
 
 
 def download_video(video_id: str, user: str, output_dir: str, platform: str,
-                   tiktok_dl: TikTokDownloader | None = None) -> Path | None:
+                   tiktok_dl: TikTokDownloader | None = None, cookies_path = "") -> Path | None:
     """Download a video and return its local path, or None on failure."""
     url = video_url(video_id, user, platform)
 
@@ -44,8 +44,12 @@ def download_video(video_id: str, user: str, output_dir: str, platform: str,
         "--js-runtimes", "node:/opt/homebrew/bin/node",
         "--remote-components", "ejs:github",
         "--quiet",
-        url,
     ]
+
+    if cookies_path != "":
+        cmd += ["--cookies", cookies_path]
+
+    cmd += [url]
     try:
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as exc:
@@ -121,11 +125,14 @@ def main():
     parser.add_argument("--video_filepath", type=str, required=True)
     parser.add_argument("--transcripts_dir", type=str, required=True)
     parser.add_argument("--downloaded_videos_dir", type=str, required=True)
+    parser.add_argument("--cookies_path", type=str, default="")
+
     args = parser.parse_args()
 
     keep_videos = args.keep_videos == "yes"
     transcripts_dir = args.transcripts_dir
     downloaded_videos_dir = args.downloaded_videos_dir
+    cookies_path = args.cookies_path
 
     tiktok_dl = TikTokDownloader(output_dir=downloaded_videos_dir, browser="firefox") if args.platform == "tiktok" else None
 
@@ -155,7 +162,7 @@ def main():
         # ── Download (or reuse an existing file) ──────────
         matches = list(Path(downloaded_videos_dir).glob(f"{video_id}.*"))
         video_path = matches[0] if matches else download_video(
-            video_id, user, downloaded_videos_dir, args.platform, tiktok_dl
+            video_id, user, downloaded_videos_dir, args.platform, tiktok_dl, cookies_path
         )
         if video_path is None:
             results_summary.append({"id": video_id, "status": "download_failed"})
