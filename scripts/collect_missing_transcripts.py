@@ -51,9 +51,12 @@ def download_video(video_id: str, user: str, output_dir: str, platform: str,
 
     cmd += [url]
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as exc:
-        print(f"  ⚠️   Download failed: {exc}\ncheck video at {url}")
+        stderr = exc.stderr or ""
+        if "Video unavailable" in stderr:
+            return "unavailable"  # sentinel distinct from None
+        print(f"  ⚠️   Download failed: {stderr}\ncheck video at {url}")
         return None
     matches = list(Path(output_dir).glob(f"{video_id}.*"))
     return matches[0] if matches else None
@@ -67,9 +70,12 @@ def transcribe_video(video_path: Path, model: WhisperModel, language: str = "fr"
         beam_size=1,
         task="transcribe",
     )
+
     segments = list(segments)  # consume the generator
+
+    text = " ".join(seg.text.strip() for seg in segments)
     return {
-        "text": " ".join(seg.text.strip() for seg in segments),
+        "text": text if text.strip() else "[no spoken words]",
         "language": info.language,
         "segments": [
             {"id": i, "start": seg.start, "end": seg.end, "text": seg.text.strip()}
@@ -164,6 +170,13 @@ def main():
         video_path = matches[0] if matches else download_video(
             video_id, user, downloaded_videos_dir, args.platform, tiktok_dl, cookies_path
         )
+
+        if video_path == "unavailable":
+            result = {"text": "[video unavailable]", "language": None, "segments": []}
+            save_transcript(video_id, result, transcripts_dir)
+            results_summary.append({"id": video_id, "status": "unavailable"})
+            continue
+
         if video_path is None:
             results_summary.append({"id": video_id, "status": "download_failed"})
             continue
