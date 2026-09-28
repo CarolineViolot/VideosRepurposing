@@ -1,87 +1,19 @@
 import os
 import sys
 import json
-import subprocess
 import argparse
 import datetime
 from pathlib import Path
-import pandas as pd
+
 
 from faster_whisper import WhisperModel
-from torch.optim.optimizer import Args
 from tqdm import tqdm
 
 if os.path.isdir("../data/"):
     os.chdir("../")
-from src.tiktok_downloader import TikTokDownloader
-
-SKIP_IDS = {"7357731711775460640", 7357731711775460640}
-
-
-def video_url(video_id: str, user: str, platform: str) -> str:
-    if platform == "tiktok":
-        return f"https://www.tiktok.com/@{user}/video/{video_id}"
-    return f"https://www.youtube.com/watch?v={video_id}"
-
-
-def download_video(video_id: str, user: str, output_dir: str, platform: str,
-                   tiktok_dl: TikTokDownloader | None = None, cookies_path = "") -> Path | None:
-    """Download a video and return its local path, or None on failure."""
-    url = video_url(video_id, user, platform)
-
-    if platform == "tiktok":
-        return tiktok_dl.download(url)
-
-    # youtube: audio only, via the yt-dlp CLI
-    out_template = str(Path(output_dir) / f"{video_id}.%(ext)s")
-    cmd = [
-        "yt-dlp",
-        "--extract-audio",
-        "--audio-format", "mp3",
-        "--audio-quality", "5",
-        "--format", "bestaudio[ext=m4a]/bestaudio",
-        "--output", out_template,
-        "--js-runtimes", "node:/opt/homebrew/bin/node",
-        "--remote-components", "ejs:github",
-        "--quiet",
-    ]
-
-    if cookies_path != "":
-        cmd += ["--cookies", cookies_path]
-
-    cmd += [url]
-    try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
-    except subprocess.CalledProcessError as exc:
-        stderr = exc.stderr or ""
-        if "Video unavailable" in stderr:
-            return "unavailable"  # sentinel distinct from None
-        print(f"  ⚠️   Download failed: {stderr}\ncheck video at {url}")
-        return None
-    matches = list(Path(output_dir).glob(f"{video_id}.*"))
-    return matches[0] if matches else None
-
-
-def transcribe_video(video_path: Path, model: WhisperModel, language: str = "fr") -> dict:
-    """Run faster-whisper on an audio/video file (ffmpeg handles decoding)."""
-    segments, info = model.transcribe(
-        str(video_path),
-        language=language,
-        beam_size=1,
-        task="transcribe",
-    )
-
-    segments = list(segments)  # consume the generator
-
-    text = " ".join(seg.text.strip() for seg in segments)
-    return {
-        "text": text if text.strip() else "[no spoken words]",
-        "language": info.language,
-        "segments": [
-            {"id": i, "start": seg.start, "end": seg.end, "text": seg.text.strip()}
-            for i, seg in enumerate(segments)
-        ],
-    }
+from src.tiktok_videos_downloader import TikTokDownloader
+from src.youtube_videos_downloader import YouTubeDownloader
+from src.whisper_transcription import video_url, download_video, transcribe_video
 
 
 def save_transcript(video_id: str, result: dict, transcripts_dir: str):
@@ -141,10 +73,11 @@ def main():
     cookies_path = args.cookies_path
 
     tiktok_dl = TikTokDownloader(output_dir=downloaded_videos_dir, browser="firefox") if args.platform == "tiktok" else None
+    youtube_dl = YouTubeDownloader(output_dir=downloaded_videos_dir) if args.platform == "youtube" else None
 
     pending_videos = load_pending_videos(args.video_filepath)
     done_ids = load_done_video_ids(transcripts_dir, args.platform)
-    pairs = [p for p in pending_videos if p[0] not in done_ids and p[0] not in SKIP_IDS]
+    pairs = [p for p in pending_videos if p[0] not in done_ids]
     #pairs.reverse()
     print(f"Processing {len(pairs)}/{len(pending_videos)} video(s).\n")
 
@@ -165,10 +98,10 @@ def main():
     for video_id, user, duration in pbar:
         pbar.set_postfix({"id": video_id, "duration": f"{int(duration // 60)}m{int(duration % 60)}s"})
 
-        # ── Download (or reuse an existing file) ──────────
+        # ── Download (or reuse an existing file) ──────────────────────────────
         matches = list(Path(downloaded_videos_dir).glob(f"{video_id}.*"))
         video_path = matches[0] if matches else download_video(
-            video_id, user, downloaded_videos_dir, args.platform, tiktok_dl, cookies_path
+            video_id, user, args.platform, tiktok_dl, youtube_dl, cookies_path
         )
 
         if video_path == "unavailable":
@@ -181,7 +114,7 @@ def main():
             results_summary.append({"id": video_id, "status": "download_failed"})
             continue
 
-        # ── Transcribe ────────────────────────────────────
+        # ── Transcribe ────────────────────────────────────────────────────────
         try:
             result = transcribe_video(video_path, model, language="fr")
         except Exception as exc:
@@ -191,7 +124,7 @@ def main():
             results_summary.append({"id": video_id, "status": "transcription_failed"})
             continue
 
-        # ── Save, clean up ────────────────────────────────
+        # ── Save, clean up ────────────────────────────────────────────────────
         save_transcript(video_id, result, transcripts_dir)
         if not keep_videos:
             video_path.unlink(missing_ok=True)
@@ -202,7 +135,7 @@ def main():
             "text_preview": result["text"][:120].strip(),
         })
 
-    # ── Final summary ─────────────────────────────────────
+    # ── Final summary ─────────────────────────────────────────────────────────
     ok = [r for r in results_summary if r["status"] == "ok"]
     failed = [r for r in results_summary if r["status"] != "ok"]
     print(f"✅  Success: {len(ok)} / {len(results_summary)}")

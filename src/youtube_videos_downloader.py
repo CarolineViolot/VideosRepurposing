@@ -3,42 +3,33 @@ YouTube Video Downloader
 
 Mirrors the TikTokDownloader interface so both classes are interchangeable.
 
-YouTube format strategy
------------------------
-YouTube serves video and audio as *separate* adaptive streams (DASH).  yt-dlp
-merges them automatically via ffmpeg when you request a combined format string
-such as ``bestvideo+bestaudio``.  This is the standard, reliable approach —
-unlike TikTok, there is no need to manually filter duplicate format variants.
+YouTube format strategy: YouTube serves video and audio as *separate* adaptive streams (DASH).  yt-dlp
+merges them automatically via ffmpeg when given a combined format string such as ``bestvideo+bestaudio``.
 
-Quality presets
----------------
+Quality presets:
 ``"best"``       — best video + best audio (default)
 ``"1080p"``      — up to 1080p video + best audio
 ``"720p"``       — up to  720p video + best audio
 ``"480p"``       — up to  480p video + best audio
 ``"audio-only"`` — best audio, saved as .m4a (no video, no ffmpeg merge needed)
 
-Requirements
-------------
-    pip install yt-dlp
-    brew install ffmpeg   # macOS
-    apt install ffmpeg    # Linux
+Requirements: yt-dlp, ffmpeg
 
-Usage
------
-    python youtube_downloader.py URL [URL ...]
-    python youtube_downloader.py --quality 1080p URL
-    python youtube_downloader.py --audio-only URL
-    python youtube_downloader.py --subs URL
-    python youtube_downloader.py --browser firefox URL
-    python youtube_downloader.py --cookies cookies.txt URL
-    python youtube_downloader.py --list-formats URL
-    python youtube_downloader.py -o ~/videos URL1 URL2
-    python youtube_downloader.py --playlist URL
+Usage:
+    python youtube_videos_downloader.py URL [URL ...]
+    python youtube_videos_downloader.py --quality 1080p URL
+    python youtube_videos_downloader.py --audio-only URL
+    python youtube_videos_downloader.py --subs URL
+    python youtube_videos_downloader.py --browser firefox URL
+    python youtube_videos_downloader.py --cookies cookies.txt URL
+    python youtube_videos_downloader.py --list-formats URL
+    python youtube_videos_downloader.py -o ~/videos URL1 URL2
+    python youtube_videos_downloader.py --playlist URL
 """
 
 import logging
 import os
+import subprocess
 from pathlib import Path
 
 import yt_dlp
@@ -58,7 +49,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S",
 )
-log = logging.getLogger("youtube_downloader")
+log = logging.getLogger("youtube_videos_downloader")
 
 # Re-export so callers that import from this module get everything they need.
 __all__ = [
@@ -252,6 +243,49 @@ class YouTubeDownloader:
                       for e in entries if e.get("id")]
         log.info(f"Playlist: {len(video_urls)} videos")
         return self.download_many(video_urls)
+
+    def download_audio_cli(self, video_id: str, cookies_path: str = "") -> "Path | str | None":
+        """
+        Download only the audio track for *video_id* by shelling out to the
+        yt-dlp CLI directly (bypassing yt_dlp's Python API), passing
+        --js-runtimes/--remote-components to satisfy YouTube's current JS
+        challenge requirement.
+
+        Returns the downloaded file's Path, the string "unavailable" if the
+        video is unavailable, or None on any other download failure.
+        """
+        os.makedirs(self.output_dir, exist_ok=True)
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        out_template = os.path.join(self.output_dir, f"{video_id}.%(ext)s")
+
+        cmd = [
+            "yt-dlp",
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "5",
+            "--format", "bestaudio[ext=m4a]/bestaudio",
+            "--output", out_template,
+            "--js-runtimes", "node:/opt/homebrew/bin/node",
+            "--remote-components", "ejs:github",
+            "--quiet",
+        ]
+
+        if cookies_path:
+            cmd += ["--cookies", cookies_path]
+
+        cmd += [url]
+
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            stderr = exc.stderr or ""
+            if "Video unavailable" in stderr:
+                return "unavailable"  # sentinel distinct from None
+            log.error(f"Download failed: {stderr}\ncheck video at {url}")
+            return None
+
+        matches = list(Path(self.output_dir).glob(f"{video_id}.*"))
+        return matches[0] if matches else None
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

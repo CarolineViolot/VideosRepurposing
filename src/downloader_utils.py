@@ -1,7 +1,7 @@
 """
 downloader_common.py — Shared utilities for video downloaders.
 
-Used by tiktok_downloader.py and youtube_downloader.py.
+Used by tiktok_videos_downloader.py and youtube_videos_downloader.py.
 """
 
 import json

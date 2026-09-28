@@ -5,17 +5,14 @@ TikTok exposes duplicate format variants (-0 and -1) for every stream.
 The -1 variants are video-only despite reporting aac in metadata.
 This script picks only -0 variants, guaranteeing audio is present.
 
-Requirements:
-    pip install yt-dlp
-    brew install ffmpeg   # macOS
-    apt install ffmpeg    # Linux
+Requirements: yt-dlp, ffmpeg
 
 Usage:
-    python tiktok_downloader.py URL [URL ...]
-    python tiktok_downloader.py --browser firefox URL
-    python tiktok_downloader.py --cookies cookies.txt URL
-    python tiktok_downloader.py --list-formats URL
-    python tiktok_downloader.py -o ~/tiktoks URL1 URL2
+    python tiktok_videos_downloader.py URL [URL ...]
+    python tiktok_videos_downloader.py --browser firefox URL
+    python tiktok_videos_downloader.py --cookies cookies.txt URL
+    python tiktok_videos_downloader.py --list-formats URL
+    python tiktok_videos_downloader.py -o ~/tiktoks URL1 URL2
 """
 
 import logging
@@ -40,7 +37,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%H:%M:%S",
 )
-log = logging.getLogger("tiktok_downloader")
+log = logging.getLogger("tiktok_videos_downloader")
 
 # Re-export for callers that import from this module.
 __all__ = [
