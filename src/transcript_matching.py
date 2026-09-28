@@ -161,7 +161,12 @@ def compute_ratios(pairs_df: pd.DataFrame, preprocessing_summary: str, transcrip
     return pairs_df
 
 
-def add_distances(pairs_df, args_dict, preprocessing_summary):
+def add_distances(pairs_df, args_dict, preprocessing_summary, keep_all_columns=False):
+    """
+    Fuzzy ratios between transcript1 and transcript2 after the preprocessing in args_dict.
+    Returns (pairs_df, preprocessing_summary). Unless keep_all_columns, pairs_df is reduced
+    to the video ids and the ratio columns.
+    """
 
     pairs_df['transcript_clean1'] = pairs_df['transcript1'].apply(
         clean_transcripts,
@@ -193,12 +198,16 @@ def add_distances(pairs_df, args_dict, preprocessing_summary):
         pairs_df = compute_ratios(pairs_df, preprocessing_summary_2, "transcript_clean1",
                                   "transcript_cut2")
         preprocessing_summary = preprocessing_summary + f"cut_{args_dict['cut_transcripts']}"
+        if keep_all_columns:
+            return pairs_df, preprocessing_summary
         return pairs_df[['videoId1', 'videoId2', 'fw.partialratio_cut_t1', 'fw.sortratio_cut_t1',
                          'fw.setratio_cut_t1', 'fw.partialratio_cut_t2', 'fw.sortratio_cut_t2',
                          'fw.setratio_cut_t2']], preprocessing_summary
     else:
         pairs_df = compute_ratios(
             pairs_df, preprocessing_summary, "transcript_clean1", "transcript_clean2")
+        if keep_all_columns:
+            return pairs_df, preprocessing_summary
         return pairs_df[['videoId1', 'videoId2', 'fw.partialratio',
                          'fw.sortratio', 'fw.setratio']], preprocessing_summary
 
@@ -245,3 +254,12 @@ def classify_pairs(pairs_df, model, best_thr):
     return pairs_df[['videoId1', 'videoId2', 'predicted_proba', 'predicted_label'] +
                     list(model.feature_names_in_)]
 
+
+def filter_small_transcripts(df, min_length=100):
+    try:
+        df = df.dropna(subset=["transcript"]).copy()
+        df["len_transcript"] = df["transcript"].str.len()
+    except KeyError:
+        df = df.dropna(subset=["voice_to_text"]).copy()
+        df["len_transcript"] = df["voice_to_text"].str.len()
+    return df.loc[df["len_transcript"] > min_length]

@@ -8,15 +8,11 @@ Between YouTube and TikTok :
 - tiktoks and pp videos from the same party
 - tiktoks and nm videos that feature politicians from the same party of the tiktok
 """
-from typing import Any
 
 import pandas as pd
-import numpy as np
 import os
-import json
-from src.file_io import create_transcripts_and_videos_by_year
-from src.transcript_matching import extract_short_transcript
-from src.utils import get_politician2party
+from src.transcript_matching import filter_small_transcripts
+from scripts.project_config import get_politician2party
 
 PAIR_COLUMNS = ["match_group", "videoId1", "videoId2"]
 ORDERED_LIST_PARTIES = ['LO', 'NPA', 'PCF', 'LFI', 'EELV', 'PS', 'PRG', 'PP', 'DG', 'RE', 'MoDem', 'UDI', 'HOR', 'DD',
@@ -24,15 +20,6 @@ ORDERED_LIST_PARTIES = ['LO', 'NPA', 'PCF', 'LFI', 'EELV', 'PS', 'PRG', 'PP', 'D
 
 if os.path.isdir("../data/"):
     os.chdir("../")
-
-def filter_small_transcripts(df, min_length=100):
-    try:
-        df = df.dropna(subset=["transcript"]).copy()
-        df["len_transcript"] = df["transcript"].str.len()
-    except KeyError:
-        df = df.dropna(subset=["voice_to_text"]).copy()
-        df["len_transcript"] = df["voice_to_text"].str.len()
-    return df.loc[df["len_transcript"] > min_length]
 
 
 def build_pairs(left_df, right_df, group_value, left_id="videoId", right_id="videoId"):
@@ -110,96 +97,6 @@ def create_pairs_youtube_tiktok(yt_transcripts, tt_transcripts, channel_type, pa
     pairs_df = pd.concat(pairs_list, ignore_index=True)
     print(len(pairs_df))
     return pairs_df
-
-def create_pairs_pp_yt_with_nm_DELETE(nm_transcripts, pp_transcripts, nm_id="videoId"):
-    pp_transcripts["transcript_short"] = pp_transcripts["transcript"].apply(extract_short_transcript, args=(2000,))
-    pp_transcripts['party'] = pp_transcripts['name_standard'].apply(lambda x: get_politician2party()[x])
-
-    politicians = [name for name in pp_transcripts["name_standard"].dropna().unique() if len(name.split()) > 1]
-
-    for polit in politicians:
-        nm_transcripts[polit] = nm_transcripts["PER_clean"].apply(is_polit_in_ner, polit=polit)
-
-    for party in ORDERED_LIST_PARTIES:
-        nm_transcripts[party] = nm_transcripts["parties"].apply(is_party_in_ner, party=party)
-
-    pairs_list = []
-
-    for party in pp_transcripts["party"].dropna().unique():
-        if party not in nm_transcripts.columns:
-            continue
-
-        news_videos = nm_transcripts.loc[nm_transcripts[party]]
-        pp_videos = pp_transcripts.loc[
-            (pp_transcripts["party"] == party) & pp_transcripts["transcript_short"].notna()
-        ]
-
-        if news_videos.empty or pp_videos.empty:
-            continue
-
-        pairs_list.append(
-            build_pairs(pp_videos, news_videos, party,
-                        right_id=nm_id)
-        )
-
-    pairs_df = pd.concat(pairs_list, ignore_index=True)
-    return pairs_df
-
-
-def create_pairs_pp_tt_with_nm_DELETE(pp_tt_transcripts, nm_transcripts, nm_id="videoId", by_party=False):
-    """
-    Pairs TikTok pp videos with nm videos (YouTube or TikTok) that mention
-    the politician (by_party=False) or any member of the politician's party
-    (by_party=True), via NER columns PER_clean / parties on nm_transcripts.
-
-    nm_id: id column of the nm source ("videoId" for YouTube, "id" for TikTok).
-    """
-    pp_tt_transcripts = filter_small_transcripts(pp_tt_transcripts).copy()
-    nm_transcripts = filter_small_transcripts(nm_transcripts).copy()
-
-    pp_tt_transcripts["party"] = pp_tt_transcripts["name_standard"].apply(
-        lambda x: get_politician2party()[x]
-    )
-
-    pairs_list = []
-
-    if by_party:
-        for party in pp_tt_transcripts["party"].dropna().unique():
-            if party not in ORDERED_LIST_PARTIES:
-                continue
-            nm_mask = nm_transcripts["parties"].apply(is_party_in_ner, party=party)
-            nm_videos = nm_transcripts.loc[nm_mask]
-            pp_videos = pp_tt_transcripts.loc[pp_tt_transcripts["party"] == party]
-            if nm_videos.empty or pp_videos.empty:
-                continue
-            pairs_list.append(
-                build_pairs(pp_videos, nm_videos, party,
-                            left_id="id", right_id=nm_id)
-            )
-    else:
-        politicians = [
-            name for name in pp_tt_transcripts["name_standard"].dropna().unique()
-            if len(name.split()) > 1
-        ]
-        for polit in politicians:
-            nm_mask = nm_transcripts["PER_clean"].apply(is_polit_in_ner, polit=polit)
-            nm_videos = nm_transcripts.loc[nm_mask]
-            pp_videos = pp_tt_transcripts.loc[
-                pp_tt_transcripts["name_standard"] == polit
-            ]
-            if nm_videos.empty or pp_videos.empty:
-                continue
-            pairs_list.append(
-                build_pairs(pp_videos, nm_videos, polit,
-                            left_id="id", right_id=nm_id)
-            )
-
-    if not pairs_list:
-        return pd.DataFrame(columns=PAIR_COLUMNS)
-    pairs_df = pd.concat(pairs_list, ignore_index=True)
-    print(len(pairs_df))
-    return pairs_df
-
 
 def create_pairs_pp_with_nm(pp_transcripts, nm_transcripts,
                             pp_id="videoId", nm_id="videoId",
