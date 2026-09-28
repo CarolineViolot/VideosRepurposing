@@ -1,13 +1,23 @@
 #Pycharm
 .idea/*
 
+# python (any depth)
+.ipynb_checkpoints/
+__pycache__/
+.pytest_cache/
+logs/
 
+
+# MACos
+*.DS_Store
 
 # project
 data/*
+data_test/
+data.zip
+
 Figures/*
-notebooks/*
-scripts/__pycache__/*
-*.DS_Store
-src/__pycache__/*
 tests/*
+.env
+
+
