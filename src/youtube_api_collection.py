@@ -38,6 +38,7 @@ import time
 import tqdm
 import pandas as pd
 import googleapiclient.errors
+import requests
 from more_itertools import chunked
 from threading import Thread, Condition, Event
 
@@ -674,6 +675,7 @@ class ShortsLabeller:
         ready_condition = Condition()
         stop_event = Event()
         stop_event.set()
+        self._errors = []  # (thread_idx, exception) of the threads that failed
 
         threads = [
             Thread(
@@ -701,6 +703,11 @@ class ShortsLabeller:
         for thread in threads:
             thread.join()
 
+        if self._errors:
+            details = "; ".join(f"thread {i}: {type(e).__name__}: {e}" for i, e in self._errors)
+            raise RuntimeError(f"{len(self._errors)} labelling thread(s) failed ({details}). "
+                               f"Checkpoints are saved: re-run to resume.")
+
     def merge_checkpoints(self, expected_length: int) -> pd.DataFrame:
         """Merge all per-thread checkpoint files into a single validated DataFrame."""
         dfs = []
@@ -708,6 +715,9 @@ class ShortsLabeller:
             if filename == ".DS_Store":
                 continue
             df = pd.read_json(os.path.join(self.checkpoint_dir, filename), lines=True)
+            if df.empty:
+                # a thread with no video (fewer videos than threads) saves an empty checkpoint
+                continue
             assert list(df.columns) == self.EXPECTED_COLUMNS, (
                 f"Unexpected columns in {filename}: {list(df.columns)}"
             )
@@ -730,33 +740,55 @@ class ShortsLabeller:
         ready_condition: Condition,
         stop_event: Event,
     ) -> None:
-        df = self._load_partition(thread_idx, n_rows, filename, data_dir)
-
-        with ready_condition:
-            ready_condition.notify()
+        try:
+            df = self._load_partition(thread_idx, n_rows, filename, data_dir)
+        except Exception as e:
+            self._errors.append((thread_idx, e))
+            raise
+        finally:
+            # always tell label_file this thread has started, even if it failed,
+            # otherwise label_file waits forever
+            with ready_condition:
+                ready_condition.notify()
 
         unlabelled = df[~df["isShort"].isin([True, False])].index
         for row_idx in tqdm.tqdm(unlabelled, desc=f"thread_{thread_idx}", position=thread_idx, leave=True):
             video_id = df.loc[row_idx, "videoId"]
             try:
-                df.loc[row_idx, "isShort"] = is_short(video_id)
+                label = self._is_short_with_retries(video_id)
             except KeyboardInterrupt:
                 self._save_checkpoint(df, thread_idx)
                 raise
-            except Exception:
-                try:
-                    time.sleep(1)
-                    df.loc[row_idx, "isShort"] = is_short(video_id)
-                except Exception:
-                    print(f"Failed twice on videoId: {video_id}")
-                    self._save_checkpoint(df, thread_idx)
-                    raise
+            except Exception as e:
+                self._save_checkpoint(df, thread_idx)
+                self._errors.append((thread_idx, e))
+                raise
+            if label is not None:
+                df.loc[row_idx, "isShort"] = label
+                if pd.isna(label):
+                    print(f"videoId {video_id}: unavailable on YouTube, left unlabelled")
 
             if not stop_event.is_set():
                 self._save_checkpoint(df, thread_idx)
                 raise KeyboardInterrupt
 
         self._save_checkpoint(df, thread_idx)
+
+    RETRY_WAITS = [5, 15, 45]  # seconds between attempts when YouTube can't be reached
+
+    def _is_short_with_retries(self, video_id: str):
+        """is_short(), retried on network errors (timeouts, connection resets).
+        Returns None if YouTube still can't be reached: the video stays unlabelled
+        and is retried on the next run."""
+        for wait in self.RETRY_WAITS + [None]:
+            try:
+                return is_short(video_id)
+            except requests.RequestException as e:
+                if wait is None:
+                    print(f"videoId {video_id}: YouTube unreachable after {len(self.RETRY_WAITS) + 1} "
+                          f"attempts ({type(e).__name__}), left unlabelled")
+                    return None
+                time.sleep(wait)
 
     def _load_partition(
         self, thread_idx: int, n_rows: int, filename: str, data_dir: str
@@ -767,8 +799,11 @@ class ShortsLabeller:
 
         checkpoint_path = self._checkpoint_path(thread_idx)
         if os.path.isfile(checkpoint_path):
-            checkpoint = pd.read_json(checkpoint_path, lines=True)[["videoId", "isShort"]]
-            checkpoint.dropna(subset=["isShort"], inplace=True)
+            checkpoint = pd.read_json(checkpoint_path, lines=True)
+            if checkpoint.empty:
+                # empty checkpoint: that thread had no video last time
+                return df
+            checkpoint = checkpoint[["videoId", "isShort"]].dropna(subset=["isShort"])
             overlap = set(checkpoint["videoId"]) & set(df["videoId"])
             for vid in overlap:
                 label = checkpoint.loc[
