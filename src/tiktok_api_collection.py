@@ -87,16 +87,23 @@ def fetch_user_info(username: str, token: str) -> dict:
     return resp.json().get("data", {})
 
 
+def read_channels_file(path) -> dict:
+    """{username: info} from a channel file, either as written by the collector
+    ({"channels": {username: {...}}}) or as a list of records with a 'username' key."""
+    with open(path) as f:
+        data = json.load(f)
+    if isinstance(data, dict):
+        return data["channels"]
+    return {row["username"]: {k: v for k, v in row.items() if k != "username"} for row in data}
+
+
 def load_existing_channels(output_file) -> dict:
-    """Load previously collected channel info, dropping incomplete entries."""
+    """Load previously collected channel info, dropping entries missing API fields."""
     required_columns = ["display_name", "follower_count", "following_count", "is_verified",
                          "likes_count", "video_count", "bio_description", "collected_at"]
-    with open(output_file) as f:
-        data = json.load(f)
-    for channel in list(data["channels"].keys()):
-        if set(required_columns) != set(data["channels"][channel].keys()):
-            data["channels"].pop(channel)
-    return data["channels"]
+    channels = read_channels_file(output_file)
+    return {username: info for username, info in channels.items()
+            if set(required_columns) <= set(info.keys())}
 
 
 # ── Date windowing ────────────────────────────────────────────────────────────

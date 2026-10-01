@@ -105,10 +105,12 @@ def ISO8601_duration_to_sec(iso_duration):
     return timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds).total_seconds()
 
 
-def is_short(ID):
+def is_short(ID, timeout=30):
+    """True if the video is a Short, False if not, NaN if YouTube reports it unavailable.
+    Raises a requests.RequestException (e.g. Timeout) if YouTube can't be reached."""
     x = requests.get(
         "https://consent.youtube.com/ml?continue=https://www.youtube.com/shorts/{}?cbrd%3D1&gl=CH&hl=de&pc=yt&uxe=eomty&src=1".format(
-            ID))
+            ID), timeout=timeout)
     if '"playabilityStatus":{"status":"ERROR",' in x.text:
         return np.nan
     if "/shorts/" in x.url:
