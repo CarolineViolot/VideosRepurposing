@@ -13,11 +13,12 @@ logs/
 
 # project
 data/*
-data_test/
 data.zip
+archives/*
 
 Figures/*
-tests/*
+tests/pipeline/data/
 .env
+REORG_PLAN.md
 
 
