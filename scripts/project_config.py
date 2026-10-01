@@ -7,7 +7,12 @@ def get_youtube_tiktok_equivalent_channels():
     return res
 
 
-def get_election_periods():
+YEARS = ["2022", "2024"]
+CHANNEL_TYPES = ["news", "pp"]
+
+
+def get_collect_periods():
+    # (start, end) of the collection, end day excluded (on both platforms)
     return {
         "2022": ("2022-02-11", "2022-06-26"),
         "2024": ("2024-03-01", "2024-07-14"),

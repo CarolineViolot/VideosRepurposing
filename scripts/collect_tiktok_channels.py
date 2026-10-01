@@ -1,10 +1,12 @@
+import argparse
 import os
 import json
 from datetime import datetime
 
 from dotenv import load_dotenv
 
-from src.tiktok_api_collection import get_access_token, fetch_user_info, load_existing_channels
+from src.tiktok_api_collection import get_access_token, fetch_user_info, read_channels_file
+from scripts.project_config import CHANNEL_TYPES
 
 if os.path.isdir("../data/"):
     os.chdir("../")
@@ -17,60 +19,32 @@ CLIENT_SECRET = os.environ["TIKTOK_CLIENT_SECRET"]
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def main():
-    channel_type = "pp"
-    if channel_type == "pp":
-        channel_ids = [
-            "reconqueteofficiel", "zemmour_eric", "sarah_knafo", "marion_marechal",
-            "rnational_off", "jordanbardella", "mlp.officiel", "sebchenu", "julienodoul", "louis_aliot", "jphtanguy",
-            "david.rachline", "edwige_diaz", "laurelavalette", "jsanchez_rn", "franckallisio", "laurentjacobelli",
-            "matthieu_valet", "fabriceleggeri", "philippe_ballard",
-            "eciotti",
-            "lesrepublicains", "laurentwauquiez_", "brunoretailleauoff", "fxbellamy", "rachida_dati",
-            "horizonsleparti", "parti_renaissance", "emmanuelmacron", "gabriel_attal", "edouardphillippe_2027",
-            "gdarmanin.officiel", "olivierveran", "karl.olive", "marleneschiappa", "prisca_thevenot", "aurore_berge",
-            "yaelbraunpivet",
-            "ppjeunes", "partisocialiste", "fhollandeofficiel", "faure_olivier", "jerome_guedj", "borisvallaud",
-            "lesecologistes", "marinetondelier", "sandrousseau", "yjadot", "marie.touss1",
-            "franceinsoumisean", "jlmelenchon", "manonaubryfr", "rima.has", "mathildepanot", "manuelbompard",
-            "guetteclemence", "francois_ruffin", "clementine_autain", "louisboyard", "sebastiendelogu", "alma_dufour",
-            "alexis_corbiere", "deputee_obono", "eric.coquerel", "bastien.lachaud", "garrido.raquel", "thomas_portes",
-            "david_guiraud", "rachel.keke.officiel", "raphael_arnault",
-            "particommuniste", "fabien_roussel", "ianbrossatsenateur", "leondeffontaines",
-            "npa.anticapitaliste", "lutteouvriereofficiel", "olivier.besancenot", "philippe.poutou", "nathaliearthaud",
-            "dominiquedevillepin", "dupontaignannicolas", "florianphilippot", "fasselineau", "uprtvfa", "aymeric.caron"
-        ]
-    elif channel_type == "news":
-        channel_ids = [
-            "artefr", "afpfr", "bfmtv", "blast_officiel", "cdanslairofficiel.365", "c_a_vous", "cnews", "europe1",
-            "france24", "france.inter", "lhumanitefr", "lexpress", "lcp_an", "lefigaro", "lemondefr", "lemediatv",
-            "nouvelobs", "leparisien", "lepointfr", "lehuffpostfr", "lesechos.fr", "mariannelemag", "mediapartfr",
-            "publicsenat", "rfi", "rmc_off", "rtl.officiel", "sudradio", "tf1info", "tv5monde", "va.plus",
-            "franceinfo", "liberation.fr"
-        ]
+def collect_channels(channel_type: str, token: str) -> None:
+    """Refresh the API info of the accounts already in the channel file, keeping their
+    curated fields (party, name_standard, ...). To add an account, add it to the file."""
     output_file = f"data/tiktok/channels/{channel_type}_channels.json"
-    # Authenticate
-    token = get_access_token(CLIENT_KEY, CLIENT_SECRET)
+    results = read_channels_file(output_file)
+    usernames = list(results)
 
-    # Load previously collected channels data
-    if os.path.exists(output_file):
-        results = load_existing_channels(output_file)
-    else:
-        results = {}
-
-    # Collect data
-    for idx, username in enumerate(channel_ids, start=1):
-        print(f"\n[{idx}/{len(channel_ids)}] Collecting data for: @{username}")
+    for idx, username in enumerate(usernames, start=1):
+        print(f"\n[{idx}/{len(usernames)}] Collecting data for: @{username}")
         user_info = fetch_user_info(username, token)
-        results[username] = user_info
-        results[username]["collected_at"] = datetime.date(datetime.now()).strftime(format="%y-%m-%d")
-        output = {
-            "total_channels": len(results),
-            "channels": results,
-        }
-        # Save to JSON
+        user_info["collected_at"] = datetime.date(datetime.now()).strftime(format="%y-%m-%d")
+        results[username] = {**results.get(username, {}), **user_info}
         with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
+            json.dump({"total_channels": len(results), "channels": results}, f, ensure_ascii=False, indent=2)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Refresh the info of the TikTok accounts listed in data/tiktok/channels/{type}_channels.json.")
+    parser.add_argument("--channel_type", choices=CHANNEL_TYPES, default=None,
+                        help="restrict to one channel type (default: all)")
+    args = parser.parse_args()
+
+    token = get_access_token(CLIENT_KEY, CLIENT_SECRET)
+    for channel_type in [args.channel_type] if args.channel_type else CHANNEL_TYPES:
+        collect_channels(channel_type, token)
 
 
 if __name__ == "__main__":

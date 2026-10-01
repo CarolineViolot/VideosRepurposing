@@ -345,10 +345,10 @@ if __name__ == "__main__":
 
     if youtube_tiktok:
         # ── TikTok ────────────────────────────────────────────────────────────
-        tt_nm_2022 = pd.read_json("data/tiktok/videos/news_videos_2022.jsonl", lines=True)
-        tt_nm_2024 = pd.read_json("data/tiktok/videos/news_videos_2024.jsonl", lines=True)
-        tt_pp_2022 = pd.read_json("data/tiktok/videos/pp_videos_2022.jsonl", lines=True)
-        tt_pp_2024 = pd.read_json("data/tiktok/videos/pp_videos_2024.jsonl", lines=True)
+        tt_nm_2022 = pd.read_json("data/tiktok/videos/news_videos_2022.jsonl", lines=True, dtype={"id": str})
+        tt_nm_2024 = pd.read_json("data/tiktok/videos/news_videos_2024.jsonl", lines=True, dtype={"id": str})
+        tt_pp_2022 = pd.read_json("data/tiktok/videos/pp_videos_2022.jsonl", lines=True, dtype={"id": str})
+        tt_pp_2024 = pd.read_json("data/tiktok/videos/pp_videos_2024.jsonl", lines=True, dtype={"id": str})
         TT_DFS = [tt_nm_2022, tt_nm_2024, tt_pp_2022, tt_pp_2024]
         all_tt_videos_df = {
             '2022': {'nm': tt_nm_2022, 'pp': tt_pp_2022},

@@ -5,14 +5,20 @@ Standardizes channel info for both platforms (mapping raw channel
 names/usernames to standardized names/orientation), and propagates each
 channel's standardized name onto its already-collected video files.
 """
-import json
+import argparse
+
 import pandas as pd
 
+from src.tiktok_api_collection import read_channels_file
 from scripts.project_config import (
-    get_channel_names_dict, get_news_channel_orientation, get_party_orientation,
+    YEARS, get_channel_names_dict, get_news_channel_orientation, get_party_orientation,
 )
 
-YEARS = ["2022", "2024"]
+
+def read_tiktok_channels_df(path: str) -> pd.DataFrame:
+    """TikTok channel file (raw collector format or records) as a DataFrame with a username column."""
+    return pd.DataFrame.from_dict(read_channels_file(path), orient="index").reset_index().rename(
+        columns={"index": "username"})
 
 
 def standardize_youtube_news_channels() -> pd.DataFrame:
@@ -39,12 +45,7 @@ def standardize_youtube_pp_channels() -> pd.DataFrame:
 
 def standardize_tiktok_news_channels() -> pd.DataFrame:
     path = "data/tiktok/channels/news_channels.json"
-    with open(path) as f:
-        raw = json.load(f)
-
-    df = pd.DataFrame.from_dict(raw["channels"], orient="index").reset_index().rename(
-        columns={"index": "username"}
-    )
+    df = read_tiktok_channels_df(path)
     df["name_standard"] = df["username"].map(get_channel_names_dict())
     df["orientation"] = df["name_standard"].map(get_news_channel_orientation())
 
@@ -54,12 +55,7 @@ def standardize_tiktok_news_channels() -> pd.DataFrame:
 
 def standardize_tiktok_pp_channels() -> pd.DataFrame:
     path = "data/tiktok/channels/pp_channels.json"
-    with open(path) as f:
-        raw = json.load(f)
-
-    df = pd.DataFrame.from_dict(raw["channels"], orient="index").reset_index().rename(
-        columns={"index": "username"}
-    )
+    df = read_tiktok_channels_df(path)
     df["name_standard"] = df["username"].apply(lambda x: get_channel_names_dict().get(x, x))
     df["orientation"] = df["party"].apply(lambda x: get_party_orientation()[x])
 
@@ -71,7 +67,7 @@ def standardize_tiktok_pp_channels() -> pd.DataFrame:
 
 
 def _merge_name_standard(video_path: str, channels_df: pd.DataFrame, on: str) -> None:
-    videos_df = pd.read_json(video_path, lines=True)
+    videos_df = pd.read_json(video_path, lines=True, dtype={"id": str, "videoId": str})
     if "name_standard" in videos_df.columns:
         videos_df = videos_df.drop(columns=["name_standard"])
 
@@ -100,6 +96,7 @@ def propagate_name_standard_to_videos() -> None:
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     standardize_youtube_news_channels()
     standardize_youtube_pp_channels()
     standardize_tiktok_news_channels()
