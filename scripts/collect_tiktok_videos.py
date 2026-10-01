@@ -1,12 +1,13 @@
+import argparse
 import os
-import json
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 
 from src.tiktok_api_collection import (
-    get_access_token, fetch_user, load_existing_videos, get_existing_channels, save,
+    get_access_token, fetch_user, load_existing_videos, get_existing_channels, save, read_channels_file,
 )
-from scripts.project_config import get_election_periods
+from scripts.project_config import CHANNEL_TYPES, YEARS, get_collect_periods
 
 if os.path.isdir("../data/"):
     os.chdir("../")
@@ -16,23 +17,21 @@ load_dotenv()
 CLIENT_KEY = os.environ["TIKTOK_CLIENT_KEY"]
 CLIENT_SECRET = os.environ["TIKTOK_CLIENT_SECRET"]
 
-collection_periods = get_election_periods()
+collection_periods = get_collect_periods()
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main():
-    year = "2022"
-    channel_type = "news"
+def collect_videos(channel_type: str, year: str, token: str) -> None:
     output_json = f"data/tiktok/videos/{channel_type}_videos_{year}.json"
+    os.makedirs(os.path.dirname(output_json), exist_ok=True)
     # Load existing data first
     existing_videos = load_existing_videos(output_json=output_json)
     existing_channels = get_existing_channels(existing_videos)
 
     print(f"Channels already in file: {sorted(existing_channels)}")
-    with open(f"data/tiktok/channels/{channel_type}_channels.json", "r") as f:
-        channel_ids = list(json.load(f)['channels'].keys())
-        print(channel_ids)
+    channel_ids = list(read_channels_file(f"data/tiktok/channels/{channel_type}_channels.json"))
+    print(channel_ids)
 
     # Only collect channels not already present
     channels_to_collect = [ch for ch in channel_ids if ch not in existing_channels]
@@ -43,8 +42,9 @@ def main():
 
     print(f"Channels to collect: {channels_to_collect}")
 
-    token = get_access_token(CLIENT_KEY, CLIENT_SECRET)
     start_date, end_date = collection_periods[year]
+    # the TikTok API includes end_date; the collection period excludes it
+    end_date = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     new_videos = []
 
     all_videos = existing_videos
@@ -65,6 +65,19 @@ def main():
     # Merge old + new
     all_videos = all_videos + new_videos
     save(all_videos, output_json=output_json)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Collect the TikTok accounts' videos in the election window.")
+    parser.add_argument("--year", choices=YEARS, default=None, help="restrict to one year (default: all)")
+    parser.add_argument("--channel_type", choices=CHANNEL_TYPES, default=None,
+                        help="restrict to one channel type (default: all)")
+    args = parser.parse_args()
+
+    token = get_access_token(CLIENT_KEY, CLIENT_SECRET)
+    for year in [args.year] if args.year else YEARS:
+        for channel_type in [args.channel_type] if args.channel_type else CHANNEL_TYPES:
+            collect_videos(channel_type, year, token)
 
 
 if __name__ == "__main__":

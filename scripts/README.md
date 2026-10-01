@@ -14,7 +14,7 @@ before each run unless noted otherwise.
 
 2. **Videos** — `python -m scripts.collect_youtube_videos`
    Collects videos for one `channel_type`/`year` (edit both in `main()`)
-   within that year's election window (`scripts/project_config.get_election_periods`),
+   within that year's election window (`scripts/project_config.get_collect_periods`),
    then labels Shorts. Writes `data/youtube/videos/{channel_type}_videos_{year}.jsonl`.
    Run once per `channel_type` x `year` combination (4 runs total: news/pp x 2022/2024).
 
@@ -53,11 +53,14 @@ Run after collecting videos for both platforms:
    for both platforms, then propagates each channel's `name_standard` onto its
    video files. Run *after* `prepare_videos`, since it needs the video jsonl
    files already in place.
-3. `python -m scripts.detect_politicians_and_parties_in_videos` — NER
-   (politicians/parties mentioned in video descriptions) and party tagging.
-   Currently scoped to TikTok news videos; toggle the `get_NER`/`clean_NER`/
-   `add_NER_to_origin`/`add_parties_to_origin` flags in `main()` for the step
-   you need.
+3. `python -m scripts.detect_politicians_and_parties_in_videos` — NER on the
+   news videos' titles on YouTube, descriptions on TikTok (CamemBERT, only for videos without a `PER` value
+   yet), then cleaned politician names (`PER_clean`) and the parties they belong
+   to (`parties`), all written into the news video files of both platforms.
+   `--platform`, `--year` and `--steps ner clean parties` restrict it.
+
+Video ids are text everywhere (TikTok `id` included): read the video files with
+`dtype={"id": str}` / `{"videoId": str}`, otherwise pandas turns them into numbers.
 
 ## Transcript-matching model
 

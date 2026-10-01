@@ -24,9 +24,9 @@ import pandas as pd
 if os.path.isdir("../data/"):
     os.chdir("../")
 
+from scripts.project_config import CHANNEL_TYPES, YEARS
+
 PLATFORMS = ["youtube", "tiktok"]
-CHANNEL_TYPES = ["news", "pp"]
-YEARS = ["2022", "2024"]
 
 TRANSCRIPT_LOC = {"youtube": "transcript", "tiktok": "voice_to_text"}
 ID_LOC = {"youtube": "videoId", "tiktok": "id"}
@@ -43,7 +43,7 @@ def load_transcript(video_id, platform):
 
 def fill_missing_transcripts(platform, channel_type, year):
     path = f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl"
-    df = pd.read_json(path, lines=True)
+    df = pd.read_json(path, lines=True, dtype={ID_LOC[platform]: str})
     len_df = len(df)
 
     transcript_loc = TRANSCRIPT_LOC[platform]
@@ -102,9 +102,9 @@ def main():
     parser.add_argument("--platform", type=str, choices=PLATFORMS, default=None,
                          help="restrict to one platform (default: youtube and tiktok)")
     parser.add_argument("--channel_type", type=str, choices=CHANNEL_TYPES, default=None,
-                         help="restrict to one channel type (default: news and pp)")
+                         help="restrict to one channel type (default: all in project_config)")
     parser.add_argument("--year", type=str, choices=YEARS, default=None,
-                         help="restrict to one year (default: 2022 and 2024)")
+                         help="restrict to one year (default: all in project_config)")
     args = parser.parse_args()
 
     platforms = [args.platform] if args.platform else PLATFORMS

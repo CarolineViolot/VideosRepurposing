@@ -54,12 +54,9 @@ def create_pairs_same_youtube_channel(transcripts):
         if shorts.empty or rvs.empty:
             continue
         pairs_list.append(build_pairs(shorts, rvs, channel_title))
-    try:
-        pairs_df = pd.concat(pairs_list, ignore_index=True)
-    except ValueError as e:
-        print(len(pairs_list))
-        print(pairs_list)
-        raise e
+    if not pairs_list:
+        return pd.DataFrame(columns=PAIR_COLUMNS)
+    pairs_df = pd.concat(pairs_list, ignore_index=True)
     print(len(pairs_df))
     return pairs_df
 
@@ -94,6 +91,8 @@ def create_pairs_youtube_tiktok(yt_transcripts, tt_transcripts, channel_type, pa
         if tt_videos.empty or yt_videos.empty:
             continue
         pairs_list.append(build_pairs(tt_videos, yt_videos, e, left_id="id"))
+    if not pairs_list:
+        return pd.DataFrame(columns=PAIR_COLUMNS)
     pairs_df = pd.concat(pairs_list, ignore_index=True)
     print(len(pairs_df))
     return pairs_df
@@ -175,6 +174,7 @@ if __name__ == "__main__":
     youtube_only=True
     across_platforms=True
     across_channels = True
+    os.makedirs("data/pairs_of_transcripts", exist_ok=True)
     #for year in ["2022", "2024"]:
     for year in ["2024"]:
         print(f"\t year : {year}")
@@ -197,9 +197,11 @@ if __name__ == "__main__":
         if across_platforms:
             print("TikTok + YouTube")
             # in __main__, replace the tt_nm load with (only if the columns exist in the file):
-            tt_nm_transcripts = pd.read_json(f'data/tiktok/videos/news_videos_{year}.jsonl', lines=True)[
+            tt_nm_transcripts = pd.read_json(f'data/tiktok/videos/news_videos_{year}.jsonl', lines=True,
+                                             dtype={"id": str})[
                 ['name_standard', 'id', 'voice_to_text', 'PER_clean', 'parties']]
-            tt_pp_transcripts = pd.read_json(f'data/tiktok/videos/pp_videos_{year}.jsonl', lines=True)[
+            tt_pp_transcripts = pd.read_json(f'data/tiktok/videos/pp_videos_{year}.jsonl', lines=True,
+                                             dtype={"id": str})[
                 ['name_standard', 'id', 'voice_to_text']]
 
 
@@ -226,9 +228,11 @@ if __name__ == "__main__":
 
         if across_channels:
             # Load tt transcripts
-            tt_nm_transcripts = pd.read_json(f'data/tiktok/videos/news_videos_{year}.jsonl', lines=True)[
+            tt_nm_transcripts = pd.read_json(f'data/tiktok/videos/news_videos_{year}.jsonl', lines=True,
+                                             dtype={"id": str})[
                 ['name_standard', 'id', 'voice_to_text', 'PER_clean', 'parties']]
-            tt_pp_transcripts = pd.read_json(f'data/tiktok/videos/pp_videos_{year}.jsonl', lines=True)[
+            tt_pp_transcripts = pd.read_json(f'data/tiktok/videos/pp_videos_{year}.jsonl', lines=True,
+                                             dtype={"id": str})[
                 ['name_standard', 'id', 'voice_to_text']]
 
             print("across channels")

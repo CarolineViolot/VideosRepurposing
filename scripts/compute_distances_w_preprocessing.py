@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 for handler in logging.root.handlers[:]:
     logging.root.removeHandler(handler)
 
+os.makedirs('logs', exist_ok=True)
 logging.basicConfig(filename='logs/transcript_matching.log', level=logging.DEBUG,
                     format='%(asctime)s:%(levelname)s:%(message)s',
                     datefmt='%m-%d-%Y %I:%M:%S')
@@ -174,10 +175,10 @@ if __name__ == "__main__":
         f"data/pairs_of_transcripts/pairs_diff_channels_tt_party_all_nm_{year}.csv",
         f"data/pairs_of_transcripts/pairs_diff_channels_yt_party_all_nm_{year}.csv",
         f'data/pairs_of_transcripts/pairs_same_actor_yt_tt_nm_{year}.csv',
-        #f'data/pairs_of_transcripts/pairs_same_actor_yt_tt_pp_{year}.csv',
+        f'data/pairs_of_transcripts/pairs_same_actor_yt_tt_pp_{year}.csv',
         f'data/pairs_of_transcripts/pairs_same_party_yt_tt_{year}.csv',
         f'data/pairs_of_transcripts/pairs_yt_same_channel_nm_{year}.csv',
-        #f'data/pairs_of_transcripts/pairs_yt_same_channel_pp_{year}.csv'
+        f'data/pairs_of_transcripts/pairs_yt_same_channel_pp_{year}.csv',
     ]:
         output_filename = input_filename.replace('.csv', '_w_d.csv')
         sys.argv = ['compute_distances_w_preprocessing.py',

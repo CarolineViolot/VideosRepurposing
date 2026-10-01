@@ -59,7 +59,8 @@ def load_all_transcripts() -> pd.DataFrame:
     for platform in PLATFORMS:
         for channel_type in CHANNEL_TYPES:
             for year in YEARS:
-                df = pd.read_json(f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl", lines=True)
+                df = pd.read_json(f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl", lines=True,
+                                  dtype={"id": str, "videoId": str})
                 if platform == "tiktok":
                     df = df.rename(columns={"id": "videoId", "voice_to_text": "transcript"})
                 frames.append(df[["videoId", "transcript", "name_standard"]])

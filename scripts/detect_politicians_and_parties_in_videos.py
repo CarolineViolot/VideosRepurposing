@@ -1,6 +1,7 @@
 from transformers import pipeline, AutoTokenizer
 from transformers import AutoModelForTokenClassification
 
+import argparse
 import os
 import sys
 import json
@@ -16,6 +17,8 @@ if module_path not in sys.path:
 
 if os.path.isdir("../data/"):
     os.chdir("../")
+
+from scripts.project_config import YEARS
 
 
 def clean_text_for_camembert(text):
@@ -64,24 +67,27 @@ def extract_infos(ner_results, entity_group, threshold=0):
         [e["word"].title() for e in ner_results if e["entity_group"] == entity_group and e["score"] > threshold])
 
 
-def create_news_channels_videos_df_NER(filepath, platform="youtube"):
-    if platform == "youtube":
-        id_col = "videoId"
-        description_col = "description"
-    if platform == "tiktok" :
-        id_col = "id"
-        description_col = "video_description"
-    news_videos_df = pd.read_json(filepath, lines=True)
-    filename = filepath.removesuffix(".jsonl")
-    if os.path.isfile(f"{filename}_NER.jsonl"):
-        news_videos_df_NER = pd.read_json(f"{filename}_NER.jsonl", lines=True)
-        missing_videos = set(news_videos_df[id_col]) - set(news_videos_df_NER[id_col])
-        print("number of missing videos:", len(missing_videos))
-    else:
-        missing_videos = set(news_videos_df[id_col])
-    missing_videos_df = news_videos_df[news_videos_df[id_col].isin(missing_videos)]
+# text the NER runs on: the title on YouTube, the description on TikTok (no title there)
+NER_TEXT_COL = {"youtube": "title", "tiktok": "video_description"}
+ID_DTYPES = {"id": str, "videoId": str}  # video ids are text everywhere
+NER_COLUMNS = ["ner_results", "LOC", "ORG", "PER"]
 
-    missing_videos_df['clean_description'] = missing_videos_df[description_col].apply(clean_text_for_camembert)
+
+def add_ner_to_videos(filepath, platform="youtube"):
+    """CamemBERT NER on the title (YouTube) / description (TikTok) of the videos that have none yet (no PER value).
+    Writes ner_results, LOC, ORG and PER into the video file."""
+    videos_df = pd.read_json(filepath, lines=True, dtype=ID_DTYPES)
+    for col in NER_COLUMNS:
+        if col not in videos_df.columns:
+            videos_df[col] = None
+    videos_df["ner_results"] = videos_df["ner_results"].astype(object)
+
+    missing = videos_df["PER"].isna()
+    print(f"{filepath}: NER on {missing.sum()}/{len(videos_df)} video(s)")
+    if not missing.any():
+        return
+
+    clean_texts = videos_df.loc[missing, NER_TEXT_COL[platform]].apply(clean_text_for_camembert)
 
     def find_bad_chars(text):
         return [(i, repr(ch), unicodedata.category(ch))
@@ -89,24 +95,19 @@ def create_news_channels_videos_df_NER(filepath, platform="youtube"):
                 if unicodedata.category(ch) in ("Cc", "Cs", "Co")]
 
     # Check if cleaning actually worked
-    for i, text in enumerate(missing_videos_df['clean_description']):
+    for i, text in enumerate(clean_texts):
         bad = find_bad_chars(str(text))
         if bad:
             print(f"Row {i} still has bad chars: {bad}")
             print(f"  Raw: {repr(text[:100])}")
-    # get ner results from the description
-    missing_videos_df["ner_results"] = get_ner_results(list(missing_videos_df.clean_description))
 
-    # add LOC, ORG and PER results to news videos df
-    missing_videos_df["LOC"] = missing_videos_df.ner_results.apply(extract_infos, args=("LOC",))
-    missing_videos_df["ORG"] = missing_videos_df.ner_results.apply(extract_infos, args=("ORG",))
-    missing_videos_df["PER"] = missing_videos_df.ner_results.apply(extract_infos, args=("PER",))
+    # get ner results from the text, then the LOC, ORG and PER entities
+    for idx, ner_results in zip(clean_texts.index, get_ner_results(list(clean_texts))):
+        videos_df.at[idx, "ner_results"] = ner_results
+        for entity_group in ["LOC", "ORG", "PER"]:
+            videos_df.at[idx, entity_group] = extract_infos(ner_results, entity_group)
 
-    if os.path.isfile(f"{filename}_NER.jsonl"):
-        video_df = pd.concat([news_videos_df_NER, missing_videos_df])
-        video_df.to_json(filepath, orient='records', lines=True, force_ascii=False)
-    else:
-        missing_videos_df.to_json(filepath, orient='records', lines=True, force_ascii=False)
+    videos_df.to_json(filepath, orient='records', lines=True, force_ascii=False)
 
 
 def get_final_name(name, name2abbname, famname2abbname, name2finalname):
@@ -128,7 +129,7 @@ def clean_name(text, name2abbname, famname2abbname, name2finalname):
 
 
 def clean_ORG_column(filepath):
-    news_videos_NER_df = pd.read_json(filepath, lines=True).fillna("")
+    news_videos_NER_df = pd.read_json(filepath, lines=True, dtype=ID_DTYPES).fillna("")
     news_videos_NER_df["ORG"] = news_videos_NER_df["ORG"].replace("/", "|", regex=True) \
                                                          .replace("-", "|", regex=True) \
                                                          .replace('LFP RN LR', "LFP|RN|LR")
@@ -136,10 +137,11 @@ def clean_ORG_column(filepath):
 
 
 def clean_PER_column_manual(filepath):
-    news_videos_NER_df = pd.read_json(filepath, lines=True)
-    # change known PER issues
-    news_videos_NER_df.loc[news_videos_NER_df.PER == 'Philippe Juvin J-L Mélenchon', "PER"] = 'Philippe Juvin|J-L Mélenchon'
-    news_videos_NER_df = news_videos_NER_df.replace("Attal-", "Attal|", regex=True) \
+    news_videos_NER_df = pd.read_json(filepath, lines=True, dtype=ID_DTYPES)
+    # change known PER issues (only in PER: the other columns, e.g. transcripts, stay untouched)
+    per = news_videos_NER_df["PER"]
+    per = per.mask(per == 'Philippe Juvin J-L Mélenchon', 'Philippe Juvin|J-L Mélenchon')
+    per = per.replace("Attal-", "Attal|", regex=True) \
         .replace("Bardella-", "Bardella|", regex=True) \
         .replace("Bompard-", "Bompard|", regex=True) \
         .replace("Macron-", "Macron|", regex=True) \
@@ -161,12 +163,12 @@ def clean_PER_column_manual(filepath):
         .replace('Juppé-Sarkozy', 'Juppé|Sarkozy', regex=True) \
         .replace("Mélenchon-Le Pen", "Mélenchon|Le Pen", regex=True)
 
-    news_videos_NER_df.PER = news_videos_NER_df.PER.apply(lambda x: x.title())
+    news_videos_NER_df["PER"] = per.apply(lambda x: x.title() if isinstance(x, str) else x)
     news_videos_NER_df.to_json(filepath, orient='records', lines=True, force_ascii=False)
 
 
 def clean_PER_column_w_dict(filepath):
-    news_videos_NER_df = pd.read_json(filepath, lines=True)
+    news_videos_NER_df = pd.read_json(filepath, lines=True, dtype=ID_DTYPES)
 
     with open("data/dict/name2abbname.json", "r") as f:
         name2abbname = json.load(f)
@@ -185,45 +187,48 @@ def clean_PER_column_w_dict(filepath):
     news_videos_NER_df.to_json(filepath, orient='records', lines=True, force_ascii=False)
 
 
-def add_PER_clean_to_origin_file(filename):
-    news_videos_df = pd.read_json(f"{filename}.jsonl", lines=True)
-    news_videos_df_PER = pd.read_json(f"{filename}_NER.jsonl", lines=True)
-    assert len(news_videos_df_PER) == len(news_videos_df)
-    news_videos_df = news_videos_df.merge(news_videos_df_PER[['id', 'PER_clean']], how='outer', on='id')
-    news_videos_df.to_json(f"{filename}.jsonl", orient='records', lines=True, force_ascii=False)
-
-
 def add_parties(filename):
-    news_videos_df = pd.read_json(f"{filename}.jsonl", lines=True)
+    news_videos_df = pd.read_json(f"{filename}.jsonl", lines=True, dtype=ID_DTYPES)
     with open('data/dict/list_of_polit_from_parties.json') as f:
         polit_from_parties = json.load(f)
     polit2parties = {name: party for party, names in polit_from_parties.items() for name in names}
-    print(polit2parties)
     news_videos_df['parties'] = news_videos_df['PER_clean'].apply(get_parties, args=(polit2parties,))
     news_videos_df.to_json(f"{filename}.jsonl", orient='records', lines=True, force_ascii=False)
 
+STEPS = ["ner", "clean", "parties"]
+
+
+def process_news_file(platform, year, steps=STEPS):
+    """NER on the news videos' titles (YouTube) / descriptions (TikTok) -> cleaned politician
+    names (PER_clean) -> parties,
+    all written into the video file.
+
+    ner      CamemBERT NER on the videos without a PER value yet (ner_results, LOC, ORG, PER)
+    clean    normalise PER into PER_clean
+    parties  derive the parties mentioned from PER_clean
+    """
+    filepath = f"data/{platform}/videos/news_videos_{year}.jsonl"
+    print(f"== {filepath}")
+    if "ner" in steps:
+        add_ner_to_videos(filepath=filepath, platform=platform)
+    if "clean" in steps:
+        clean_PER_column_manual(filepath)
+        clean_PER_column_w_dict(filepath)
+    if "parties" in steps:
+        add_parties(filepath.removesuffix(".jsonl"))
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Detect politicians and parties mentioned in news videos.")
+    parser.add_argument("--platform", choices=list(NER_TEXT_COL), default=None, help="default: both")
+    parser.add_argument("--year", choices=YEARS, default=None, help="default: all in project_config")
+    parser.add_argument("--steps", nargs="+", choices=STEPS, default=STEPS, help="default: all, in order")
+    args = parser.parse_args()
+
+    for platform in [args.platform] if args.platform else list(NER_TEXT_COL):
+        for year in [args.year] if args.year else YEARS:
+            process_news_file(platform, year, args.steps)
+
+
 if __name__ == "__main__":
-    filepath = "data/tiktok/videos/news_videos_2024.jsonl"
-    filename = filepath.removesuffix(".jsonl")
-
-    get_NER = False
-    clean_NER = False
-    add_NER_to_origin = False
-    add_parties_to_origin = True
-
-    if get_NER:
-        print("get NER")
-        create_news_channels_videos_df_NER(filepath=filepath, platform='tiktok')
-
-    if clean_NER:
-        print("clean NER")
-        clean_PER_column_manual(f"{filename}_NER.jsonl")
-        clean_PER_column_w_dict(f"{filename}_NER.jsonl")
-
-    if add_NER_to_origin:
-        print("add NER to origin")
-        add_PER_clean_to_origin_file(filename)
-
-    if add_parties_to_origin:
-        print("add parties to origin")
-        add_parties(filename)
+    main()

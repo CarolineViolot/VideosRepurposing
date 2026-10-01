@@ -23,6 +23,7 @@ Outputs:
 
 Read by notebooks 07 (upload patterns), 08, 09 and 10.
 """
+import argparse
 import os
 import pickle
 
@@ -34,11 +35,9 @@ if os.path.isdir("../data/"):
     os.chdir("../")
 
 from src.transcript_matching import add_transcript_to_video_pairs, classify_pairs, clean_transcripts
-from scripts.project_config import get_politician2party
+from scripts.project_config import CHANNEL_TYPES, YEARS, get_politician2party
 
 PLATFORMS = ["youtube", "tiktok"]
-CHANNEL_TYPES = ["news", "pp"]
-YEARS = ["2022", "2024"]
 YEAR = "2024"
 
 MODEL_PATH = "data/model.pkl"
@@ -71,7 +70,8 @@ def load_videos() -> pd.DataFrame:
     for platform in PLATFORMS:
         for channel_type in CHANNEL_TYPES:
             for year in YEARS:
-                df = pd.read_json(f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl", lines=True)
+                df = pd.read_json(f"data/{platform}/videos/{channel_type}_videos_{year}.jsonl", lines=True,
+                                  dtype={"id": str, "videoId": str})
                 if platform == "tiktok":
                     df = df.rename(columns={"id": "videoId", "voice_to_text": "transcript", "create_time": "publishedAt"})
                     df["videoId"] = df["videoId"].apply(str)
@@ -97,6 +97,11 @@ def load_standard_names(platform: str, channel_type: str) -> list:
 # ── Classify ──────────────────────────────────────────────────────────────────
 
 def get_classified_pairs(filename, transcripts, model, best_thr):
+    if not os.path.isfile(filename):
+        # compute_distances writes no file when there is no pair (possible on a small test run)
+        print(f"{filename} not found, treated as no pairs")
+        return pd.DataFrame(columns=["videoId1", "videoId2", "predicted_proba", "predicted_label"]
+                            + list(model.feature_names_in_))
     video_pairs = pd.read_csv(filename, dtype={"videoId1": str, "videoId2": str})
     video_pairs = add_transcript_to_video_pairs(video_pairs, transcripts, filename)
     return classify_pairs(video_pairs, model, best_thr)
@@ -118,14 +123,14 @@ def add_name_standard_to_transcript_pairs(pairs_df, videoid2standard_name, polit
         assert not w_tt, "same_channel and w_tt (with tiktok) can't be true at the same time"
         pairs_df["name_standard"] = pairs_df["videoId1"].map(videoid2standard_name)
         pairs_df["party"] = pairs_df["name_standard"].apply(lambda x: politician2party.get(x, None))
-        if pairs_df["party"].isna().all():
+        if len(pairs_df) and pairs_df["party"].isna().all():
             pairs_df = pairs_df.drop(columns=["party"])
     elif w_tt:
         pairs_df["tt_name_standard"] = pairs_df["videoId1"].map(videoid2standard_name)
         pairs_df["yt_name_standard"] = pairs_df["videoId2"].map(videoid2standard_name)
         pairs_df["party"] = pairs_df["tt_name_standard"].apply(lambda x: politician2party.get(x, None))
         # all party NA means these are news pairs
-        if pairs_df["party"].isna().all():
+        if len(pairs_df) and pairs_df["party"].isna().all():
             pairs_df = pairs_df.drop(columns=["party"])
     else:
         pairs_df["name_standard1"] = pairs_df["videoId1"].map(videoid2standard_name)
@@ -278,6 +283,7 @@ def run(model_path=MODEL_PATH, threshold_path=THRESHOLD_PATH,
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter).parse_args()
     run()
 
 
