@@ -43,6 +43,9 @@ python -m scripts.run_transcripts_collection
 python -m scripts.collect_missing_transcripts --keep_videos no
 python -m scripts.add_missing_transcripts
 
+# 4b. move the videos the APIs no longer return to unavailable_videos.jsonl
+python -m scripts.check_video_availability
+
 # 5. politicians and parties mentioned in the news videos (NER)
 python -m scripts.detect_politicians_and_parties_in_videos
 

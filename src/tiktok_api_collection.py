@@ -187,6 +187,52 @@ def fetch_user(token: str, username: str, start_date: str, end_date: str) -> lis
     return all_videos
 
 
+def fetch_existing_video_ids(token: str, video_ids: list[str], start: str, end: str) -> set[str]:
+    """
+    Return the ids among *video_ids* that the Research API still returns, for videos
+    created between *start* and *end* (YYYYMMDD, both included, at most 30 days apart).
+    API errors are raised, never taken as "unavailable".
+    """
+    url = f"{VIDEO_QUERY_URL}?fields=id"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    found = set()
+    for i in range(0, len(video_ids), MAX_COUNT):
+        batch = [str(v) for v in video_ids[i:i + MAX_COUNT]]
+        cursor, search_id, has_more = 0, "", True
+        while has_more:
+            body = {
+                "query": {"and": [{"operation": "IN", "field_name": "video_id", "field_values": batch}]},
+                "start_date": start,
+                "end_date": end,
+                "max_count": MAX_COUNT,
+                "cursor": cursor,
+            }
+            if search_id:
+                body["search_id"] = search_id
+
+            r = requests.post(url, headers=headers, data=json.dumps(body))
+            if r.status_code == 429:
+                print("Rate limit reached, waiting 60s...")
+                time.sleep(60)
+                continue
+            if not r.ok:
+                raise RuntimeError(f"TikTok Research API HTTP {r.status_code}: {r.text}")
+            data = r.json()
+            if data.get("error", {}).get("code") != "ok":
+                raise RuntimeError(f"TikTok Research API error: {data.get('error')}")
+
+            found |= {str(v["id"]) for v in data["data"].get("videos", [])}
+            has_more = data["data"].get("has_more", False)
+            cursor = data["data"].get("cursor", 0)
+            search_id = data["data"].get("search_id", "")
+            time.sleep(1)
+    return found
+
+
 def load_existing_videos(output_json) -> list[dict]:
     """Load existing videos from a JSON file if present."""
     if os.path.exists(output_json):

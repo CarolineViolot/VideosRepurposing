@@ -118,6 +118,20 @@ def list_query(api_key: str, video_ids: str, parts: str) -> dict:
     ).execute()
 
 
+def get_available_video_ids(video_ids: list[str], api_key: str) -> set[str]:
+    """
+    Return the ids among *video_ids* that the YouTube Data API still returns.
+    Deleted and private videos are not returned. API errors are raised, never
+    taken as "unavailable".
+    """
+    youtube = create_youtube_client(api_key)
+    available = set()
+    for batch in chunked(video_ids, 50):
+        response = youtube.videos().list(part="id", id=",".join(batch), maxResults=50).execute()
+        available |= {item["id"] for item in response.get("items", [])}
+    return available
+
+
 def add_statistics(df: pd.DataFrame, api_key: str) -> pd.DataFrame:
     """
     Enrich *df* with view, like, and comment counts fetched from the API today.
