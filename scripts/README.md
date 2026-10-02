@@ -53,7 +53,13 @@ Run after collecting videos for both platforms:
    for both platforms, then propagates each channel's `name_standard` onto its
    video files. Run *after* `prepare_videos`, since it needs the video jsonl
    files already in place.
-3. `python -m scripts.detect_politicians_and_parties_in_videos` — NER on the
+3. `python -m scripts.check_video_availability` — asks the YouTube Data API and
+   the TikTok Research API which videos still exist; the ones no longer returned
+   (deleted, private, ...) are moved to `data/{platform}/videos/unavailable_videos.jsonl`
+   and are not part of the shared data. Leaves a file unchanged if more than half of
+   its videos come back unavailable (`--max_unavailable_share`), as that points to an
+   API problem.
+4. `python -m scripts.detect_politicians_and_parties_in_videos` — NER on the
    news videos' titles on YouTube, descriptions on TikTok (CamemBERT, only for videos without a `PER` value
    yet), then cleaned politician names (`PER_clean`) and the parties they belong
    to (`parties`), all written into the news video files of both platforms.
