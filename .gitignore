@@ -21,4 +21,4 @@ tests/pipeline/data/
 .env
 REORG_PLAN.md
 
-
+notebooks/PoliticalAgendaSetting/*
