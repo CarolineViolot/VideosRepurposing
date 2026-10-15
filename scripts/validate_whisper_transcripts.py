@@ -4,7 +4,7 @@ scripts/validate_whisper_transcripts.py
 Collects faster-whisper transcripts for the test samples used to check that
 whisper transcripts agree with the platform-provided ones (TikTok API
 voice_to_text, youtube_transcript_api). The comparison itself is done in
-notebooks/06_compare that whisper results are ok.ipynb.
+notebooks/04_API_vs_whisper_transcripts.ipynb.
 
 Inputs (samples of 2 videos per channel with a platform transcript, created once):
   - data/test_transcript_collection_accuracy/tiktok_test.jsonl

@@ -32,7 +32,7 @@ ERROR_MESSAGES = {
 def merge_transcripts_into_videos(results: dict, video_filename: str) -> None:
     """Merge fetched transcripts into the video jsonl, tagging new rows'
     'generated_by' as 'youtube_transcript_api' (error messages go to
-    'error_transcript' instead, matching the notebook 01 behavior)."""
+    'error_transcript' instead)."""
     if not results:
         return
 
