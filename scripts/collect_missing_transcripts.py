@@ -12,7 +12,8 @@ if os.path.isdir("../data/"):
     os.chdir("../")
 from src.tiktok_videos_downloader import TikTokDownloader
 from src.youtube_videos_downloader import YouTubeDownloader
-from src.whisper_transcription import video_url, download_video, transcribe_video
+from src.utils import video_url
+from src.whisper_transcription import download_video, transcribe_video
 from scripts.project_config import CHANNEL_TYPES, YEARS
 
 PLATFORMS = ["youtube", "tiktok"]
@@ -107,7 +108,7 @@ def transcribe_missing(platform: str, video_filepath: str, transcripts_dir: str,
         try:
             result = transcribe_video(video_path, model, language="fr")
         except Exception as exc:
-            print(f"  ⚠️   Transcription failed: {exc}\ncheck video at {video_url(video_id, user, platform)}")
+            print(f"  ⚠️   Transcription failed: {exc}\ncheck video at {video_url(video_id, user)}")
             print(f"removing downloaded video at {video_path}")
             video_path.unlink(missing_ok=True)
             results_summary.append({"id": video_id, "status": "transcription_failed"})

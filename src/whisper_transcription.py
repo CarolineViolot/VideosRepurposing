@@ -9,12 +9,7 @@ from faster_whisper import WhisperModel
 
 from src.tiktok_videos_downloader import TikTokDownloader
 from src.youtube_videos_downloader import YouTubeDownloader
-
-
-def video_url(video_id: str, user: str, platform: str) -> str:
-    if platform == "tiktok":
-        return f"https://www.tiktok.com/@{user}/video/{video_id}"
-    return f"https://www.youtube.com/watch?v={video_id}"
+from src.utils import video_url
 
 
 def download_video(video_id: str, user: str, platform: str,
@@ -23,7 +18,7 @@ def download_video(video_id: str, user: str, platform: str,
                    cookies_path: str = "") -> "Path | str | None":
     """Download a video and return its local path, the "unavailable" sentinel, or None on failure."""
     if platform == "tiktok":
-        return tiktok_dl.download(video_url(video_id, user, platform))
+        return tiktok_dl.download(video_url(video_id, user))
 
     return youtube_dl.download_audio_cli(video_id, cookies_path=cookies_path)
 

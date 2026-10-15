@@ -14,11 +14,34 @@ from matplotlib.ticker import EngFormatter
 
 load_dotenv()
 
-YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
+# None when not set: importing this module must not require the key (only the YouTube API calls do)
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
 
 formatter_engineer = EngFormatter(places=0, sep="")
 
+
+def video_url(video_id: str, user: str = "user") -> str:
+    """Public URL of a video. *user* (the account's username) is only used for TikTok."""
+    platform = get_platform(video_id)
+    if platform == "tiktok":
+        return f"https://www.tiktok.com/@{user}/video/{video_id}"
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
+def get_platform(video_id) -> str:
+    """'youtube' or 'tiktok', from the form of the video id: YouTube ids are 11 characters
+    (letters, digits, '-', '_'), TikTok ids are longer and made of digits only."""
+    video_id = str(video_id)
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+        return "youtube"
+    if video_id.isdigit():
+        return "tiktok"
+    raise ValueError(f"Not a YouTube or TikTok video id: {video_id!r}")
+
+
 def create_youtube_client(APIkey):
+    if not APIkey:
+        raise ValueError("No YouTube API key: set YOUTUBE_API_KEY in the .env file")
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     api_service_name = "youtube"
     api_version = "v3"

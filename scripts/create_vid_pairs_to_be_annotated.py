@@ -5,6 +5,7 @@ import random
 from tqdm import tqdm
 from fuzzywuzzy import fuzz
 from src.transcript_matching import extract_short_transcript, filter_small_transcripts
+from src.utils import video_url
 from scripts.project_config import get_politician2party
 
 if os.path.isdir("../data/"):
@@ -89,8 +90,8 @@ def _pair_rows(similarities):
                     "pair_type": pair_type,
                     "id1": pair_data[0],
                     "id2": pair_data[1],
-                    "url1": f"https://www.youtube.com/watch?v=/{pair_data[0]}",
-                    "url2": f"https://www.youtube.com/watch?v={pair_data[1]}",
+                    "url1": video_url(pair_data[0]),
+                    "url2": video_url(pair_data[1]),
                     "value": pair_data[2],
                 }
             )
@@ -288,8 +289,8 @@ def _match_platform_pairs(tt_df, yt_df, group_col, tt_id_col, yt_id_col, output_
             rows.append({
                 "group": group,
                 "pair_type": pair_type,
-                "tiktok_url": f"https://www.tiktok.com/@{username}/video/{tt_id}",
-                "youtube_url": f"https://www.youtube.com/watch?v={yt_id}",
+                "tiktok_url": video_url(tt_id, username),
+                "youtube_url": video_url(yt_id),
                 "value": score,
             })
     pd.DataFrame(rows).to_excel(output_xlsx, index=False)

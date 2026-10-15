@@ -21,11 +21,12 @@ Outputs:
   - data/networks/parties_2024/{party}_gs_parties_2024.gv
       reposts among all members of a party
 
-Read by notebooks 07 (upload patterns), 08, 09 and 10.
+Read by notebooks 05 (upload patterns), 06, 07 and 08.
 """
 import argparse
 import os
 import pickle
+import unicodedata
 
 import networkx as nx
 import numpy as np
@@ -224,6 +225,8 @@ def write_graphs(gs: dict, graph_type: str, networks_dir: str) -> None:
     out_dir = f"{networks_dir}/{graph_type}_{YEAR}"
     os.makedirs(out_dir, exist_ok=True)
     for name, g in gs.items():
+        # file names in NFC (composed accents), the form of the names in the data
+        name = unicodedata.normalize("NFC", name)
         nx.nx_agraph.write_dot(g, f"{out_dir}/{name}_gs_{graph_type}_{YEAR}.gv")
 
 
