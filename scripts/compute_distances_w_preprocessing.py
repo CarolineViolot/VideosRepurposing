@@ -2,16 +2,11 @@
 scripts/compute_distances_w_preprocessing.py
 ----------------------------
 Computes fuzzy ratios (partial / token-sort / token-set) between the transcripts
-of candidate video pairs, after the requested preprocessing.
+of candidate video pairs, after the requested preprocessing. Input is a pairs csv
+(videoId1, videoId2); transcripts are looked up in the {year} video files, and
+only ids + ratio columns are appended to --output_filename (resumable, pairs
+already in the output are skipped).
 
-Two modes:
-  - default: input is a pairs csv (videoId1, videoId2); transcripts are looked up
-    in the {year} video files, and only ids + ratio columns are appended to
-    --output_filename (resumable, pairs already in the output are skipped).
-  - --test 1: input is a labeled-pairs csv that already carries transcript1/2
-    (e.g. data/youtube/transcripts/manual_annotations/labeled_pairs_all.csv);
-    every column is kept and the output file and ratio columns are suffixed with
-    the preprocessing applied (read by notebook 03 to compare preprocessings).
 
 Without arguments, runs the 2024 production batch (see __main__); see
 scripts/run_*_transcripts_matching.sh for the command-line usage.
@@ -38,8 +33,6 @@ logging.basicConfig(filename='logs/transcript_matching.log', level=logging.DEBUG
                     format='%(asctime)s:%(levelname)s:%(message)s',
                     datefmt='%m-%d-%Y %I:%M:%S')
 
-PREPROCESSING_FLAGS = ['strip_accents', 'lowercase', 'remove_brackets', 'remove_openers']
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Benchmark various parameters on transcripts matching.")
@@ -56,16 +49,9 @@ def parse_args():
     parser.add_argument('--output_filename', type=str, required=True, help="filename to save")
     parser.add_argument('--chunksize', type=int, required=False, default=0,
                         help="chunksize for pd.read_csv if necessary")
-    parser.add_argument('--year', type=str, required=False, default=None,
-                        help="year of the video files to read transcripts from (not needed with --test 1)")
-    parser.add_argument('--test', type=int, required=False, default=0,
-                        help="1: evaluation mode on labeled pairs that already carry their transcripts")
-    args = parser.parse_args()
-    if not args.test and args.year is None:
-        parser.error("--year is required unless --test 1")
-    if args.test and args.chunksize > 0:
-        parser.error("there can't be a chunksize in test mode")
-    return args
+    parser.add_argument('--year', type=str, required=True,
+                        help="year of the video files to read transcripts from")
+    return parser.parse_args()
 
 
 def load_already_done_pairs(filename):
@@ -116,24 +102,9 @@ def process_pairs_df(pairs_df, all_transcripts, already_done_pairs, args_dict, l
     return pairs_df
 
 
-def run_test_mode(args_dict):
-    """Evaluation mode: keep all columns, name the output after the preprocessing applied."""
-    pairs_df = pd.read_csv(args_dict['input_filename'], dtype={'videoId1': str, 'videoId2': str})
-    preprocessing_summary = "_" + "_".join(f for f in PREPROCESSING_FLAGS if args_dict[f] == 1)
-    pairs_df, preprocessing_summary = add_distances(pairs_df, args_dict, preprocessing_summary,
-                                                    keep_all_columns=True)
-    output_filename = args_dict['output_filename'].replace('.csv', f'{preprocessing_summary}.csv')
-    os.makedirs(os.path.dirname(output_filename) or '.', exist_ok=True)
-    pairs_df.to_csv(output_filename, index=False)
-    print(f"Saved -> {output_filename}")
-
-
 def main():
     args = parse_args()
     args_dict = vars(args)
-    if args_dict['test']:
-        run_test_mode(args_dict)
-        return
 
     chunksize = args_dict['chunksize']
     output_filename = args_dict['output_filename']

@@ -10,7 +10,7 @@ Outputs:
   - data/best_thr.txt       the selected probability threshold
   - data/pairs_of_transcripts/training_pairs.jsonl
                             the labeled training pairs with their features,
-                            read by notebooks/05_model_training.ipynb for diagnostics
+                            read by notebooks/03_model_training_diagnosis.ipynb for diagnostics
 """
 import os
 import pickle
@@ -45,6 +45,8 @@ FEATURE_COLUMNS = [
     "partialratio_cut_t2",
     "sortratio_cut_t1",
     "sortratio_cut_t2",
+    "setratio_cut_t1",
+    "setratio_cut_t2",
 ]
 CUT_LENGTH = 2000
 
